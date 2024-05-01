@@ -56,6 +56,6 @@ jobs:
           IMAGE_TAG: ${{ github.event.inputs.tag }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
         run: |
-          sed -i.bak "s|DOCKER_IMAGE|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" tasks/task-6-1/webapp/k8s/webapp.yaml && \
-          kubectl apply -f tasks/task-6-1/webapp/k8s/webapp.yaml
+          sed -i.bak "s|DOCKER_IMAGE|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" webapp/src/k8s/webapp.yaml && \
+          kubectl apply -f webapp/src/k8s/webapp.yaml
           echo "deploy to eks success"
