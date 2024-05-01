@@ -6,15 +6,12 @@ on:
       tag:
         description: "Tag to deploy"
         required: true
-        type: choice
-        options:
-          - "v0.0.9"
-          - "v0.0.10"
 
 env:
-  ecr: 332211267476.dkr.ecr.ap-northeast-1.amazonaws.com
+  ecr: 814254045460.dkr.ecr.ap-northeast-1.amazonaws.com
   image: task-6-1
-  cluster: task-6-1-eks
+  EKS_CLUSTER_NAME: task-6-1-eks
+  ECR_REPOSITORY: task-6-1
 
 jobs:
   notify-discord:
@@ -26,7 +23,6 @@ jobs:
           -X POST \
           -d '{"content": "Webapp ${{ github.event.inputs.tag }} 準備部署到 Production! 請協助 Approve: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
           ${{ secrets.DISCORD_WEBHOOK_URL }}
-
   deploy:
     needs: notify-discord
     runs-on: ubuntu-latest
@@ -35,15 +31,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH and execute commands on jump server
-        uses: appleboy/ssh-action@master
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.JUMP_SERVER }}
-          username: ${{ secrets.JUMP_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            cd pipeline_lab
-            git pull
-            sed -i "s|${{ env.ecr }}/${{ env.image }}:.*|${{ env.ecr }}/${{ env.image }}:${{ github.event.inputs.tag }}|g" webapp/k8s/webapp.yaml
-            kubectl apply -f webapp/k8s/webapp.yaml
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Update EKS Cluster config
+        env:
+          EKS_CLUSTER_NAME: ${{ env.EKS_CLUSTER_NAME }}
+          AWS_REGION: ap-northeast-1
+        run: |
+          aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+          echo "update eks config success"
+
+      - name: Deploy to EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.inputs.tag }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+        run: |
+          sed -i.bak "s|DOCKER_IMAGE|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" tasks/task-6-1/webapp/k8s/webapp.yaml && \
+          kubectl apply -f tasks/task-6-1/webapp/k8s/webapp.yaml
+          echo "deploy to eks success"
