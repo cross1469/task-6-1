@@ -6,7 +6,7 @@ app.use(express.json());
 
 app.get("/", async (req, res) => {
   res.send({
-    task: "6-1 pipeline",
+    task: "6-1 pipeline test",
   });
 });
 
